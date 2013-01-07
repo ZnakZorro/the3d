@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="Author" content="Gerard Ferrandez at http://www.dhteumeuleu.com/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="HandheldFriendly" content="true">
+<meta name="description" content="quadrantics - HTML5 CANVAS demo">
+<link rel="shortcut icon" href="favicon.ico"/>
+<title>quadrantics - HTML5 CANVAS demo</title>
+
+<style>
+html {
+	overflow: hidden;
+	-ms-touch-action: none;
+	-ms-content-zooming: none;
+}
+body {
+	position: absolute;
+	margin: 0px;
+	padding: 0px;
+	background: #000;
+	width: 100%;
+	height: 100%;
+}
+#screen {
+	position: absolute;
+	background: #000;
+	width: 100%;
+	height: 100%;
+	cursor:pointer;
+}
+</style>
+
+<script src="ge1doot.js"></script>
+
+<script>
+/* =======================================================
+ *  ---- grid deform ----
+ * script: Gerard Ferrandez - January 2013
+ * Released under the MIT license
+ * http://www.dhteumeuleu.com/LICENSE.html
+ * ======================================================= */
+
+"use strict";
+
+(function () {
+	var scr, ctx, pointer, points, planes, over,
+		size, radius, force = -1.5, spring = 0.05, friction = 0.9, ngrid = 6,
+		npoints = (ngrid + 1) * (ngrid + 1), nplanes = ngrid * ngrid;
+	// ==== Points constructor ====
+	var Points = function (x, y) {
+		this.x  = Math.round(0.5 * (scr.width -  (size * ngrid)) + x);
+		this.y  = Math.round(0.5 * (scr.height - (size * ngrid)) + y);
+		this.X  = this.x;
+		this.Y  = this.y;
+		this.vx = 0;
+		this.vy = 0;
+		this.d  = 0;
+	}
+	Points.prototype.update = function () {
+		var z, a, x, y,
+			dx = pointer.X - this.x,
+			dy = pointer.Y - this.y;
+		this.d = Math.sqrt(dx * dx + dy * dy);
+		if (this.d < radius) {
+			z = this.d * force * (radius - this.d) / radius,
+			a = Math.atan2(dy, dx);
+			x = this.x + Math.cos(a) * z;
+			y = this.y + Math.sin(a) * z;
+		} else {
+			x = this.x;
+			y = this.y;
+		}
+		this.vx = (this.vx + (x - this.X) * spring) * friction;
+		this.vy = (this.vy + (y - this.Y) * spring) * friction;
+		this.X += this.vx;
+		this.Y += this.vy;
+	}
+	// ==== Planes constructor ====
+	var Plane = function (p0, p1, p2, p3) {
+		this.p0 = p0;
+		this.p1 = p1;
+		this.p2 = p2;
+		this.p3 = p3;
+		this.d  = 0;
+	}
+	// ==== compute z-index ====
+	Plane.prototype.update = function () {
+		this.zIndex = Math.max(this.p0.d, this.p1.d, this.p2.d, this.p3.d);
+	}
+	// ==== draw Plane ====
+	Plane.prototype.draw = function () {
+		// ---- path ----
+		ctx.beginPath();
+		ctx.moveTo(this.p0.X, this.p0.Y);
+		ctx.lineTo(this.p1.X, this.p1.Y);
+		ctx.lineTo(this.p2.X, this.p2.Y);
+		ctx.lineTo(this.p3.X, this.p3.Y);
+		ctx.closePath();
+		// ---- fill color ----
+		if (ctx.isPointInPath(pointer.X, pointer.Y)) {
+			if (this.d < 260) this.d += 20;
+			over = true;
+		} else {
+			if (this.d > 0) this.d -= 10;
+		}
+		var c = 255 - Math.round(this.zIndex / scr.minSize * 255);
+		ctx.fillStyle = "RGB(" + c + "," + this.d + "," + this.d + ")";
+		ctx.fill();
+	}
+	/* ==== build grid ==== */
+	var creatGrid = function () {
+		// ---- create points ----
+		points = [];
+		for (var i = 0; i <= ngrid; i++) {
+			for (var j = 0; j <= ngrid; j++) {
+				points.push(
+					new Points(
+						size * j,
+						size * i
+					)
+				);
+			}
+		}
+		// ---- create grid ----
+		planes = [];
+		for (var i = 0; i < ngrid; i++) {
+			for (var j = 0; j < ngrid; j++) {
+				planes.push(
+					new Plane(
+						points[i + (ngrid + 1) * j],
+						points[i + (ngrid + 1) * j + 1],
+						points[i + (ngrid + 1) * (j + 1) + 1],
+						points[i + (ngrid + 1) * (j + 1)]
+					)
+				);
+			}
+		}
+	}
+	/* ==== main loop ==== */
+	var run = function () {
+		/* ---- clear screen ---- */
+		ctx.clearRect(0, 0, scr.width, scr.height);
+		// ---- onclick ----
+		if (pointer.isDown && !pointer.hasMoved) force = -4; else force = -1.5;
+		// ---- update points ----
+		for (var i = 0; i < npoints; i++) {
+			points[i].update();
+		}
+		// ---- update grid ----
+		for (var i = 0; i < nplanes; i++) {
+			planes[i].update();
+		}
+		// ---- zIndex sorting ----
+		planes.sort(function (p0, p1) {
+			return p1.zIndex - p0.zIndex;
+		});
+		// ---- draw grid ----
+		for (var i = 0; i < nplanes; i++) {
+			planes[i].draw();
+		}
+		// ---- remove cursor ----
+		if (over) {
+			scr.setCursor("none");
+			over = false;
+		} else {
+			scr.setCursor("default");
+		}
+		// ---- next frame ----
+		requestAnimFrame(run);
+	}
+	/* ==== init script ==== */
+	var init = function () {
+		// ---- canvas ----
+		scr = new ge1doot.Screen({
+			container: "screen",
+			resize: function () {
+				scr.minSize = Math.min(scr.width, scr.height);
+				var s = 0.8 * scr.minSize;
+				size = s / ngrid;
+				radius = s / 3;
+				creatGrid();
+			}
+		});
+		ctx = scr.ctx;
+		scr.resize();
+		// ---- pointer ----
+		pointer = new ge1doot.Pointer({});
+		pointer.X = scr.width  * 0.5;
+		pointer.Y = scr.height * 0.5;
+		run();
+	}
+	return {
+		// ---- launch script -----
+		load : function (setup) {
+			window.addEventListener('load', function () {
+				init(setup);
+			}, false);
+		}
+	}
+})().load();
+</script>
+</head>
+
+<body>
+
+<canvas id="screen">CANVAS lens grid simulation</canvas>
+<!-- dhteumeuleu nav menu -->
+<!--h1 class="title">quadrantics</h1-->
+
+<!-- end of dhteumeuleu nav menu -->
+<!-- google analytics -->
+<script>
+
+</script>
+</body>
+</html>

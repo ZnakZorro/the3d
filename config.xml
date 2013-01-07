@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+    <widget xmlns = "http://www.w3.org/ns/widgets"
+        xmlns:gap = "http://phonegap.com/ns/1.0"
+        id        = "com.phonegap.the3demos"
+        versionCode="10" 
+        version   = "0.0.1">
+
+    <name>The 3D demos</name>
+
+    <description>
+        The 3D demos
+    </description>
+
+    <author href="http://zszczech.zut.edu.pl/git" email="zs@g.pl">
+        ZnakZorro
+    </author>
+    <preference name="phonegap-version" value="2.2.0" />
+    <preference name="orientation"      value="default" />
+    <preference name="target-device"    value="universal" />
+    <preference name="fullscreen"       value="false" />
+	
+<icon src="icon.png" />
+<icon src="icon.png" gap:platform="android" gap:density="ldpi" />
+<icon src="icon.png" gap:platform="android" gap:density="mdpi" />
+<icon src="icon.png" gap:platform="android" gap:density="hdpi" />
+<icon src="icon.png" gap:platform="android" gap:density="xhdpi" />
+ 
+    <gap:splash src="icon.png"  gap:platform="android" gap:density="ldpi" />
+    <gap:splash src="icon.png"  gap:platform="android" gap:density="mdpi" />
+    <gap:splash src="icon.png"  gap:platform="android" gap:density="hdpi" />
+    <gap:splash src="icon.png" gap:platform="android" gap:density="xhdpi" />
+</widget>
