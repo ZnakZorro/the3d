@@ -116,6 +116,8 @@ ge1doot.Pointer = function (setup) {
 		this.setup.down && this.setup.down(e);
 	}
 	this.pointerMove = function(e) {
+		//x=Math.random();
+		//console.log(this);
 		this.Xr = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX);
 		this.Yr = (e.clientY !== undefined ? e.clientY : e.touches[0].clientY);
 		this.X  = this.Xr - this.screen.left;
@@ -133,6 +135,29 @@ ge1doot.Pointer = function (setup) {
 			}
 		}
 		this.setup.move && this.setup.move(e);
+	}
+	this.pointerMoveRand = function(e) {
+		this.Xr = Math.random()*500;
+		this.Yr = Math.random()*500;
+		this.X  = this.Xr;// - this.screen.left;
+		this.Y  = this.Yr;// - this.screen.top + ((html && html.scrollTop) || body.scrollTop);
+		if (this.isDown) {
+			this.Xi = bXi + (this.X - sX);
+			this.Yi = bYi - (this.Y - sY);
+		}
+		if (Math.abs(this.X - sX) > 11 || Math.abs(this.Y - sY) > 11) {
+			this.hasMoved = true;
+			if (this.isDown) this.isDraging = true;
+			else {
+				sX = this.X;
+				sY = this.Y;
+			}
+		}
+console.log(this.X);
+console.log(this.Y);
+		this.pointerMove;
+		this.setup.move(this);
+		//this.setup.move && this.setup.move(e);
 	}
 	this.pointerUp = function(e) {
 		bXi = this.Xi;
@@ -169,6 +194,7 @@ ge1doot.Pointer = function (setup) {
 		this.elem.onmousemove       = function (e) { self.pointerMove(e);   }
 		this.elem.onmouseup         = function (e) { self.pointerUp(e);     }
 	}
+//window.setInterval(this.pointerMoveRand,333);			
 }
 
 // ===== smooth animation =====
@@ -182,4 +208,6 @@ window.requestAnimFrame = (function(){
 		function( run ){
 			window.setTimeout(run, 16);
 		};
+
 })();
+

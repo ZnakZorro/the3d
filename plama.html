@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="Author" content="Gerard Ferrandez at http://www.dhteumeuleu.com/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="HandheldFriendly" content="true">
+<meta name="description" content="sleep on it - HTML5 metaballs CANVAS demo">
+<meta name="keywords" content="canvas,metaball,blob,lavalamp,marching squares">
+<link rel="canonical" href="http://www.dhteumeuleu.com/sleep-on-it">
+<link rel="alternate" type="application/rss+xml" title="HTML5 interactive experiments" href="http://www.dhteumeuleu.com/rss.xml"/>
+<link rel="shortcut icon" href="favicon.ico"/>
+<title>sleep on it - HTML5 metaballs CANVAS demo</title>
+<style>
+html {
+	overflow: hidden;
+	-ms-touch-action: none;
+	-ms-content-zooming: none;
+}
+body {
+	position: absolute;
+	margin: 0px;
+	padding: 0px;
+	background: #000;
+	width: 100%;
+	height: 100%;
+}
+#screen {
+	position: absolute;
+	background: #000;
+	left: 50%;
+	width: 100%;
+	height: 100%;
+	cursor:pointer;
+}
+</style>
+<script src="ge1doot.js"></script>
+<script>
+/* =======================================================
+ *  ---- HTML5 CANVAS Lavalamp ----
+ * script: Gerard Ferrandez - 21 January 2013
+ * Released under the MIT license
+ * http://www.dhteumeuleu.com/LICENSE.html
+ * ======================================================= */
+
+"use strict";
+
+(function () {
+	var scr, ctx, pointer, lava, backFill;
+	// ==== Point constructor ====
+	var Point = function (x, y) {
+		this.x = x;
+		this.y = y;
+		this.d = x * x + y * y;
+	}
+	Point.prototype.add = function (p) {
+		return new Point (this.x + p.x, this.y + p.y);
+	}
+	Point.prototype.mult = function (p) {
+		return new Point (this.x * p.x, this.y * p.y);
+	}
+	// ==== Ball constructor ====
+	var Ball = function (parent) {
+		this.vel = new Point(
+			(Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 0.25),
+			(Math.random() > 0.5 ? 1 : -1) * (0.2 + Math.random() * 1)
+		);
+		this.vem = new Point(0, 0);
+		this.pos = new Point(
+			parent.width  * 0.5,
+			parent.height * 0.5
+		);
+		this.size = (parent.height / 20) + Math.random() * (parent.height / 15);
+	}
+	// ==== move balls ====
+	Ball.prototype.move = function () {
+		// ---- interact with pointer ----
+		if (pointer.isDown) {
+			var dx = pointer.X - this.pos.x;
+			var dy = pointer.Y - this.pos.y;
+			var d = Math.sqrt(dx * dx + dy * dy);
+			var a = Math.atan2(dy, dx);
+			var v = -Math.min(10, 100 / d);
+			this.vem = new Point(Math.cos(a) * v, Math.sin(a) * v);
+		}
+		// ---- bounce borders ----
+		if (this.pos.x >= this.width - this.size * 0.5) {
+			this.vel.x = -this.vel.x;
+			this.pos.x = this.width - this.size * 0.5;
+		} else  if (this.pos.x <= this.size * 0.5) {
+			this.vel.x = -this.vel.x;
+			this.pos.x = this.size * 0.5;
+		}
+		if (this.pos.y >= this.height - this.size * 0.5) {
+			this.vel.y = -this.vel.y;
+			this.pos.y = this.height - this.size * 0.5;
+		} else if (this.pos.y <= this.size * 0.5) {
+			this.vel.y = -this.vel.y;
+			this.pos.y = this.size * 0.5;
+		}
+		// ---- velocity ----
+		this.pos = this.pos.add(this.vem);
+		this.pos = this.pos.add(this.vel);
+		this.vem = this.vem.mult(new Point(0.98, 0.98));
+	}
+	// ==== lavalamp constructor ====
+	var LavaLamp = function (width, height, numBalls, c0, c1) {
+		this.step		= 10;
+		this.width		= width;
+		this.height		= height;
+		this.sx			= Math.floor(this.width / this.step);
+		this.sy			= Math.floor(this.height / this.step);
+		this.paint		= false;
+		this.metaFill	= createRadialGradient(width, height, width, c0, c1);
+		this.plx		= [0,0,1,0,1,1,1,1,1,1,0,1,0,0,0,0];
+		this.ply		= [0,0,0,0,0,0,1,0,0,1,1,1,0,1,0,1];
+		this.mscases    = [0,3,0,3,1,3,0,3,2,2,0,2,1,1,0];
+		this.ix 		= [1,0,-1,0,0,1,0,-1,-1,0,1,0,0,1,1,0,0,0,1,1];
+		this.computed   = [];
+		this.force      = [];
+		this.grid		= [];
+		this.balls		= [];
+		// ---- init grid ----
+		for (var i = 0; i < (this.sx + 2) * (this.sy + 2); i++) {
+			this.grid[i] = new Point(
+				(i % (this.sx + 2)) * this.step,
+				(Math.floor(i / (this.sx + 2))) * this.step
+			)
+		}
+		// ---- create metaballs ----
+		for( var i = 0; i < numBalls; i++) {
+			this.balls[i] = new Ball(this);
+		}
+		Ball.prototype.width = this.width;
+		Ball.prototype.height = this.height;
+	}
+	// ==== compute cell force ====
+	LavaLamp.prototype.computeForce = function (x, y, idx) {
+		var force;
+		var id = idx || x + y * (this.sx + 2);
+		if (x === 0 || y === 0 || x === this.sx || y === this.sy) {
+			var force = 0.6;
+		} else {
+			var cell = this.grid[id];
+			var force = 0;
+			var i = 0, ball;
+			while (ball = this.balls[i++]) {
+				force += ball.size * ball.size / (
+					- 2 * cell.x * ball.pos.x 
+					- 2 * cell.y * ball.pos.y 
+					+ ball.pos.d + cell.d
+				);
+			}
+		}
+		this.force[id] = force;
+		return force;
+	}
+	// ---- compute cell ----
+	LavaLamp.prototype.marchingSquares = function (next) {
+		var x = next[0];
+		var y = next[1];
+		var pdir = next[2];
+		var id = x + y * (this.sx + 2);
+		if (this.computed[id]) return false;
+		var dir, mscase = 0;
+		// ---- neighbors force ----
+		for (var i = 0; i < 4; i++) {
+			var idn = (x + this.ix[i+12]) + (y + this.ix[i+16]) * (this.sx + 2);
+			var force = this.force[idn] || this.computeForce(
+				x + this.ix[i+12], 
+				y + this.ix[i+16], 
+				idn
+			);
+			if (force > 1) mscase += Math.pow(2, i);
+		}
+		if (mscase === 15) {
+			// --- inside ---
+			return [x, y - 1, false];
+		} else {
+			// ---- ambiguous cases ----
+			if (mscase === 5) dir = (pdir === 2) ? 3 : 1;
+			else if (mscase === 10) dir = (pdir === 3) ? 0 : 2;
+			else {
+				// ---- lookup ----
+				dir = this.mscases[mscase];
+				this.computed[id] = true;
+			}
+			// ---- draw line ----
+			var ix = this.step / (
+				Math.abs(this.force[(x + this.plx[4*dir+2]) + (y + this.ply[4*dir+2]) * (this.sx + 2)] - 1) / 
+				Math.abs(this.force[(x + this.plx[4*dir+3]) + (y + this.ply[4*dir+3]) * (this.sx + 2)] - 1) + 1
+			);	
+			ctx.lineTo(
+				this.grid[(x + this.plx[4*dir+0]) + (y + this.ply[4*dir+0]) * (this.sx + 2)].x + this.ix[dir] * ix,
+				this.grid[(x + this.plx[4*dir+1]) + (y + this.ply[4*dir+1]) * (this.sx + 2)].y + this.ix[dir+4] * ix
+			);
+			this.paint = true;
+			// ---- next ----
+			return [
+				x + this.ix[dir+4], 
+				y + this.ix[dir+8], 
+				dir
+			];
+		}
+	}
+	LavaLamp.prototype.renderMetaballs = function () {
+		var i = 0, ball;
+		while (ball = this.balls[i++]) ball.move();
+		// ---- reset grid ----
+		this.computed = [];
+		this.force    = [];
+		this.paint    = false;
+		ctx.fillStyle = this.metaFill;
+		ctx.beginPath();
+		// ---- compute metaballs ----
+		i = 0;
+		while (ball = this.balls[i++]){  
+			// ---- first cell ----
+			var next = [
+				Math.round(ball.pos.x / this.step), 
+				Math.round(ball.pos.y / this.step), false
+			];
+			// ---- marching squares ----
+			do {
+				next = this.marchingSquares(next);
+			} while (next);
+			// ---- fill and close path ----
+			if (this.paint) {
+				ctx.fill();
+				ctx.closePath();
+				ctx.beginPath();
+				this.paint = false;
+			} 
+		}
+	}
+	// ==== compute gradients ====
+	var createRadialGradient = function (w, h, r, c0, c1) {
+		var gradient = ctx.createRadialGradient(
+			w / 2, h / 2, 0,
+			w / 2, h / 2, r
+		);
+		gradient.addColorStop(0, c0);
+		gradient.addColorStop(1, c1);
+		return gradient;
+	}
+	// ==== main loop ====
+	var run = function () {
+		// ---- clear screen ----
+		ctx.fillStyle = backFill;
+		ctx.fillRect(0, 0, scr.width, scr.height);
+		// ---- render lava ----
+		lava.renderMetaballs();
+		// ---- next frame ----
+		requestAnimFrame(run);
+	}
+	// ==== init script ====
+	var init = function (s) {
+		// ---- canvas ----
+		scr = new ge1doot.Screen({
+			container: "screen"
+		});
+		ctx = scr.ctx;
+		// ---- resize canvas ----
+		var w = Math.min(scr.width, 400);
+		scr.elem.style.width = w + "px";
+		scr.elem.style.marginLeft = Math.round(-w / 2) + "px";
+		scr.resize();
+		// ---- pointer ----
+		pointer = new ge1doot.Pointer({});
+		// ---- create LavaLamps ----
+		backFill = createRadialGradient(scr.width, scr.height, scr.width, "#333", "#000");
+		lava = new LavaLamp(w, scr.height, 8, "#ffc821", "#fa0000");
+		// ---- start engine ----
+		run();
+	}
+	return {
+		// ---- launch script -----
+		load : function (setup) {
+			window.addEventListener('load', function () {
+				init();
+			}, false);
+		}
+	}
+})().load();
+</script>
+</head>
+<body>
+<canvas id="screen">CANVAS metaballs simulation</canvas>
+
+</body>
+</html>
